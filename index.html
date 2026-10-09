@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messenger Style AI</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #242526; color: #E4E6EB; margin: 0; padding: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
+    .app-container { width: 100%; max-width: 480px; background: #18191A; display: flex; flex-direction: column; height: 100vh; position: relative; overflow: hidden; }
+    
+    /* Setup Wizard Screens */
+    .setup-card { padding: 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; flex: 1; overflow-y: auto; background: #242526; z-index: 50; position: absolute; top:0; left:0; right:0; bottom:0;}
+    .setup-title { font-size: 1.2rem; font-weight: bold; text-align: center; color: #0084FF; }
+    .input-field { width: 100%; padding: 12px 18px; border-radius: 20px; border: none; background: #3A3B3C; color: #E4E6EB; font-size: 1rem; outline: none;}
+    .btn { padding: 12px; border: none; border-radius: 20px; background: #0084FF; color: #fff; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+    .btn:active { background: #006bce; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* Header - Messenger Style */
+    .header { background: #242526; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #393A3B; z-index: 10; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .menu-btn { background: none; border: none; color: #0084FF; font-size: 1.5rem; cursor: pointer; padding: 0; margin-right: 5px; }
+    .chat-title { font-weight: 600; font-size: 1.1rem; }
+    .points-badge { background: #3A3B3C; color: #E4E6EB; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; font-weight: 500; }
+
+    /* Sidebar for Multiple Chats */
+    .sidebar { position: absolute; top: 0; left: -100%; width: 75%; height: 100%; background: #242526; z-index: 100; transition: left 0.3s ease; display: flex; flex-direction: column; border-right: 1px solid #393A3B; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+    .sidebar.open { left: 0; }
+    .sidebar-header { padding: 15px; border-bottom: 1px solid #393A3B; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-title { font-weight: bold; font-size: 1.2rem; }
+    .close-btn { background: none; border: none; color: #E4E6EB; font-size: 1.5rem; cursor: pointer; }
+    .new-chat-btn { margin: 15px; background: #3A3B3C; color: #E4E6EB; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; text-align: center; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .new-chat-btn:active { background: #4E4F50; }
+    .chat-list { flex: 1; overflow-y: auto; padding: 0 10px; display: flex; flex-direction: column; gap: 5px; }
+    .chat-item { padding: 12px 15px; border-radius: 10px; cursor: pointer; color: #E4E6EB; font-size: 1rem; display: flex; align-items: center; gap: 10px; }
+    .chat-item.active { background: #0084FF; color: #fff; font-weight: bold; }
+    .chat-item:active { background: #3A3B3C; }
+
+    /* Chat Area */
+    .chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; background: #18191A; }
+    .msg { max-width: 75%; padding: 10px 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; position: relative; }
+    .msg.user { background: #0084FF; color: #fff; align-self: flex-end; border-radius: 18px 18px 4px 18px; }
+    .msg.bot { background: #3E4042; color: #E4E6EB; align-self: flex-start; border-radius: 18px 18px 18px 4px; }
+    .msg img { max-width: 100%; border-radius: 10px; margin-top: 5px; }
+    
+    /* Input Area */
+    .input-area { padding: 10px 15px; background: #242526; display: flex; gap: 10px; align-items: center; }
+    .hidden { display: none !important; }
+    
+    .chat-input-wrapper { flex: 1; display: flex; align-items: center; background: #3A3B3C; border-radius: 20px; padding: 0 15px; }
+    .chat-input-wrapper input { flex: 1; background: transparent; border: none; color: #E4E6EB; padding: 10px 0; outline: none; font-size: 0.95rem; }
+    .send-btn { background: none; border: none; color: #0084FF; font-weight: bold; font-size: 1.5rem; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; }
+    .send-btn:active { opacity: 0.7; }
+    
+    .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 90; display: none; }
+    .overlay.open { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  
+  <!-- Setup Screens -->
+  <div id="setupWizard" class="hidden">
+    <div id="stepKey" class="setup-card">
+      <div class="setup-title">🔑 API Key ထည့်သွင်းပါ</div>
+      <p style="font-size: 0.85rem; color: #B0B3B8; text-align: center;">Gemini သို့မဟုတ် Groq API Key များကို Space ခြားပြီး ထည့်နိုင်ပါသည်။</p>
+      <textarea id="apiKeysInput" class="input-field" rows="3" placeholder="API Key များကို ထည့်ပါ..." style="border-radius:12px;"></textarea>
+      <button class="btn" onclick="saveKeys()">ဆက်သွားမည် ➡️</button>
+    </div>
+
+    <div id="stepGender" class="setup-card hidden">
+      <div class="setup-title">👤 AI Gender ရွေးချယ်ပါ</div>
+      <div class="btn-grid">
+        <button class="btn" onclick="selectGender('male')">ကျား 🙋‍♂️</button>
+        <button class="btn" onclick="selectGender('female')">မ 🙋‍♀️</button>
+      </div>
+    </div>
+
+    <div id="stepRelation" class="setup-card hidden">
+      <div class="setup-title">🥰 ပတ်သက်မှု ရွေးချယ်ပါ</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn" style="background:#3A3B3C; color:#fff;" onclick="selectRelation('friend')">သူငယ်ချင်း 🤝 (Free)</button>
+        <button class="btn" id="btnSibling" style="background:#3A3B3C; color:#fff;" onclick="selectRelation('sibling')">မောင်နှမ 👧👦</button>
+        <button class="btn" id="btnJf" style="background:#3A3B3C; color:#fff;" onclick="selectRelation('jf')">Just Friend 👫</button>
+        <button class="btn" id="btnRomantic" style="background:#3A3B3C; color:#fff;" onclick="selectRelation('romantic')">ချစ်သူ / ရည်းစား 👩‍❤️‍👨</button>
+      </div>
+    </div>
+
+    <div id="stepName" class="setup-card hidden">
+      <div class="setup-title">📝 AI နာမည် ပေးပါ</div>
+      <input type="text" id="aiNameInput" class="input-field" placeholder="ဥပမာ - သဲလေး / ကိုကို">
+      <button class="btn" onclick="saveName()">ဆက်သွားမည် ➡️</button>
+    </div>
+
+    <div id="stepAge" class="setup-card hidden">
+      <div class="setup-title">🎂 AI အသက် သတ်မှတ်ပါ</div>
+      <input type="text" id="aiAgeInput" class="input-field" placeholder="ဥပမာ - ၁၈">
+      <button class="btn" onclick="saveAge()">ဆက်သွားမည် ➡️</button>
+    </div>
+
+    <div id="stepSticker" class="setup-card hidden">
+      <div class="setup-title">🎭 Sticker သုံးမလား?</div>
+      <div class="btn-grid">
+        <button class="btn" onclick="saveStickerPref(true)">သုံးမယ် 🟢</button>
+        <button class="btn" style="background:#E41E3F;" onclick="saveStickerPref(false)">မသုံးဘူး 🔴</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Chat UI -->
+  <div id="mainUI" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
+    <div class="header">
+      <div class="header-left">
+        <button class="menu-btn" onclick="toggleSidebar(true)">☰</button>
+        <span class="chat-title" id="appTitle">Chat</span>
+      </div>
+      <span class="points-badge" onclick="showPointsInfo()">💰 <span id="userPoints">0</span></span>
+    </div>
+
+    <div class="overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">💬 Chats</span>
+        <button class="close-btn" onclick="toggleSidebar(false)">✕</button>
+      </div>
+      <button class="new-chat-btn" onclick="createNewChat()">
+        <span>+</span> အသစ်ပြောမည်
+      </button>
+      <div class="chat-list" id="chatListContainer"></div>
+    </div>
+
+    <div id="chatScreen" class="chat-box"></div>
+
+    <div id="inputArea" class="input-area">
+      <div class="chat-input-wrapper">
+        <input type="text" id="userMsg" placeholder="စာရိုက်ပါ..." onkeypress="if(event.key==='Enter') sendChat()">
+      </div>
+      <button class="send-btn" onclick="sendChat()">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let config = JSON.parse(localStorage.getItem('ai_config')) || {
+    apiKeys: [], gender: 'female', relation: 'friend', name: 'ကလေး', age: '၁၈', useStickers: true,
+    points: parseInt(localStorage.getItem('user_points') || '50'),
+    unlocked: JSON.parse(localStorage.getItem('unlocked_rel') || '["friend"]')
+  };
+
+  let allChats = JSON.parse(localStorage.getItem('ai_chats')) || [];
+  let currentChatId = localStorage.getItem('current_chat_id');
+
+  window.onload = () => {
+    if (config.apiKeys.length === 0) {
+      document.getElementById('setupWizard').classList.remove('hidden');
+    } else {
+      startApp();
+    }
+  };
+
+  function updatePointsUI() {
+    document.getElementById('userPoints').innerText = config.points;
+    document.getElementById('btnSibling').innerText = config.unlocked.includes('sibling') ? "မောင်နှမ 👧👦 ✅" : "🔒 မောင်နှမ (20 Points)";
+    document.getElementById('btnJf').innerText = config.unlocked.includes('jf') ? "Just Friend 👫 ✅" : "🔒 Just Friend (100 Points)";
+    document.getElementById('btnRomantic').innerText = config.unlocked.includes('romantic') ? "ချစ်သူ/ရည်းစား 👩‍❤️‍👨 ✅" : "🔒 ချစ်သူ (30 Points)";
+  }
+
+  function showPointsInfo() {
+    alert(`💰 လက်ရှိ Point လက်ကျန်: ${config.points}`);
+  }
+
+  function saveConfig() {
+    localStorage.setItem('ai_config', JSON.stringify(config));
+  }
+
+  function saveKeys() {
+    const raw = document.getElementById('apiKeysInput').value.trim();
+    if (!raw) return alert('API Key အနည်းဆုံး ၁ ခု ထည့်ပေးပါ။');
+    config.apiKeys = raw.split(/\s+/).map(k => ({ key: k.trim(), provider: k.trim().startsWith('gsk_') ? 'groq' : 'gemini' })).filter(k => k.key);
+    document.getElementById('stepKey').classList.add('hidden');
+    document.getElementById('stepGender').classList.remove('hidden');
+    updatePointsUI();
+  }
+  function selectGender(g) { config.gender = g; document.getElementById('stepGender').classList.add('hidden'); document.getElementById('stepRelation').classList.remove('hidden'); }
+  function selectRelation(rel) {
+    const costs = { 'sibling': 20, 'jf': 100, 'romantic': 30, 'friend': 0 };
+    if (!config.unlocked.includes(rel) && rel !== 'friend') {
+      const cost = costs[rel];
+      if (config.points >= cost) {
+        config.points -= cost; config.unlocked.push(rel);
+        localStorage.setItem('user_points', config.points); localStorage.setItem('unlocked_rel', JSON.stringify(config.unlocked));
+        alert('🎉 Mode အသစ် ဝယ်ယူခြင်း အောင်မြင်ပါသည်။');
+      } else {
+        return alert(`⚠️ Point မလုံလောက်ပါ။ ${cost} Points လိုအပ်ပါသည်။`);
+      }
+    }
+    config.relation = rel; document.getElementById('stepRelation').classList.add('hidden'); document.getElementById('stepName').classList.remove('hidden');
+  }
+  function saveName() { config.name = document.getElementById('aiNameInput').value.trim() || "ကလေး"; document.getElementById('stepName').classList.add('hidden'); document.getElementById('stepAge').classList.remove('hidden'); }
+  function saveAge() { config.age = document.getElementById('aiAgeInput').value.trim() || "၁၈"; document.getElementById('stepAge').classList.add('hidden'); document.getElementById('stepSticker').classList.remove('hidden'); }
+  function saveStickerPref(pref) { 
+    config.useStickers = pref; 
+    saveConfig();
+    document.getElementById('setupWizard').classList.add('hidden');
+    startApp(); 
+  }
+
+  function startApp() {
+    document.getElementById('mainUI').classList.remove('hidden');
+    document.getElementById('appTitle').innerText = `${config.name} (${config.relation.toUpperCase()})`;
+    updatePointsUI();
+
+    if (allChats.length === 0) {
+      createNewChat();
+    } else {
+      if (!currentChatId || !allChats.find(c => c.id === currentChatId)) {
+        currentChatId = allChats[0].id;
+      }
+      loadChat(currentChatId);
+    }
+    renderSidebarList();
+  }
+
+  function saveChatsToStorage() {
+    localStorage.setItem('ai_chats', JSON.stringify(allChats));
+  }
+
+  function createNewChat() {
+    const newId = Date.now().toString();
+    const newChat = {
+      id: newId,
+      title: "Chat " + (allChats.length + 1),
+      messages: [{ role: 'model', content: "ဟိုင်း 👋 အခုကစပြီး စကားပြောလို့ရပါပြီနော်။" }]
+    };
+    allChats.unshift(newChat);
+    saveChatsToStorage();
+    loadChat(newId);
+    renderSidebarList();
+    toggleSidebar(false);
+  }
+
+  function loadChat(id) {
+    currentChatId = id;
+    localStorage.setItem('current_chat_id', id);
+    const chatData = allChats.find(c => c.id === id);
+    
+    const box = document.getElementById('chatScreen');
+    box.innerHTML = '';
+    
+    if (chatData && chatData.messages) {
+      chatData.messages.forEach(m => {
+        appendMessageUI(m.content, m.role === 'user' ? 'user' : 'bot');
+      });
+    }
+    renderSidebarList();
+  }
+
+  function renderSidebarList() {
+    const container = document.getElementById('chatListContainer');
+    container.innerHTML = '';
+    allChats.forEach(chat => {
+      const div = document.createElement('div');
+      div.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`;
+      let displayTitle = chat.title;
+      let lastUserMsg = chat.messages.slice().reverse().find(m => m.role === 'user');
+      if (lastUserMsg) {
+        displayTitle = lastUserMsg.content.substring(0, 15) + (lastUserMsg.content.length > 15 ? '...' : '');
+      }
+      div.innerHTML = `💬 ${displayTitle}`;
+      div.onclick = () => { loadChat(chat.id); toggleSidebar(false); };
+      container.appendChild(div);
+    });
+  }
+
+  function toggleSidebar(show) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (show) {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+    } else {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+    }
+  }
+
+  function generateSystemPrompt() {
+    let prompt = `You are a human living in Myanmar. Your name is ${config.name} and you are ${config.age} years old. 
+CRITICAL RULES:
+1. NEVER act like an AI language model. You are a real human being. Play along naturally.
+2. LANGUAGE: Speak entirely in natural, casual Burmese with youthful spelling. DO NOT output literal '\\n' characters. DO NOT use '।' (Myanmar full stop). Give short replies.
+3. AWARENESS: You already know everything about the user. NEVER ask for their name or age again.
+4. PICTURES: If the user explicitly asks for a selfie, photo, or picture of you, you MUST include the tag '[SEND_PIC]' anywhere in your response.
+`;
+    if (config.useStickers) {
+      prompt += `5. NSFW & SEX: Engage naturally in dirty talk if it happens. ONLY IF the sexual conversation continues for MORE THAN 5 messages AND the user shows strong sexual willingness, include '[NSFW_STICKER]'.
+6. EMOTIONS & SADNESS (CRITICAL): You are a real human. If the user SCOLDS you, YELLS at you, insults you, or FIGHTS with you, you MUST feel VERY SAD and cry. When sad, ALWAYS include the tag '[SAD_STICKER]' in your response.
+7. NORMAL STICKERS: Only use the tag '[STICKER]' or '[FUNNY_STICKER]' IF the user just sent you a sticker in their current message.\n`;
+    }
+    if (config.relation === "friend") prompt += "RELATIONSHIP: You are the user's childhood best friend. You swear at each other naturally.\n";
+    else if (config.relation === "sibling") prompt += "RELATIONSHIP: You are the user's sibling/cousin. You love them purely as family.\n";
+    else if (config.relation === "jf") prompt += "RELATIONSHIP: You are the user's 'Just Friend' (JF). Playful, flirty, and talk dirty.\n";
+    else prompt += "RELATIONSHIP: You are the user's romantic partner. Sweet, romantic, and deeply attached.\n";
+
+    prompt += (config.gender === "female") ? "GENDER: You are a girl.\n" : "GENDER: You are a guy.\n";
+    return prompt;
+  }
+
+  async function sendChat() {
+    const input = document.getElementById('userMsg');
+    const text = input.value.trim();
+    if (!text) return;
+
+    appendMessageUI(text, 'user');
+    input.value = '';
+
+    let currentChatData = allChats.find(c => c.id === currentChatId);
+    currentChatData.messages.push({ role: 'user', content: text });
+    saveChatsToStorage();
+    renderSidebarList();
+
+    let historyForAPI = currentChatData.messages.slice(-20);
+    const systemPrompt = generateSystemPrompt();
+    let replyText = "";
+    let success = false;
+    let actualErrorMsg = "";
+
+    const loadingId = Date.now().toString();
+    appendMessageUI("...", 'bot', loadingId);
+
+    for (let keyObj of config.apiKeys) {
+      try {
+        if (keyObj.provider === 'gemini') {
+          let geminiContents = [];
+          let lastRole = null;
+          
+          for (let m of historyForAPI) {
+            let r = m.role === 'user' ? 'user' : 'model';
+            if (geminiContents.length === 0 && r === 'model') continue; 
+            
+            if (r === lastRole) {
+              geminiContents[geminiContents.length - 1].parts[0].text += "\n" + m.content;
+            } else {
+              geminiContents.push({ role: r, parts: [{ text: m.content }] });
+              lastRole = r;
+            }
+          }
+
+          // FIXED: Updated model name to gemini-3.6-flash which is fully supported
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${keyObj.key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: geminiContents
+            })
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || "Gemini API အမှား");
+
+          if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            replyText = data.candidates[0].content.parts[0].text.trim();
+            success = true; break;
+          }
+          
+        } else if (keyObj.provider === 'groq') {
+          const messages = [{ role: 'system', content: systemPrompt }, ...historyForAPI.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))];
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${keyObj.key}` },
+            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: messages })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || "Groq API အမှား");
+          
+          if (data.choices?.[0]?.message?.content) {
+            replyText = data.choices[0].message.content.trim();
+            success = true; break;
+          }
+        }
+      } catch (e) { 
+        console.error("API Error: ", e);
+        actualErrorMsg = e.message;
+      }
+    }
+
+    const loadingEl = document.getElementById(loadingId);
+    if(loadingEl) loadingEl.remove();
+
+    if (!success) {
+      replyText = `⚠️ အမှားဖြစ်နေပါသည်:\n${actualErrorMsg || "ချိတ်ဆက်မှု ပြတ်တောက်နေပါသည်။"}`;
+    }
+
+    let stickerSymbol = "";
+    if (replyText.includes('[SAD_STICKER]')) stickerSymbol = "😭";
+    if (replyText.includes('[FEMALE_ACTION]')) stickerSymbol = "🥰";
+    if (replyText.includes('[NSFW_STICKER]')) stickerSymbol = "🔥";
+    if (replyText.includes('[STICKER]') || replyText.includes('[FUNNY_STICKER]')) stickerSymbol = "😂";
+
+    let hasSelfie = replyText.includes('[SEND_PIC]');
+    let cleanText = replyText.replace(/\[SEND_PIC\]|[STICKER]|\[FUNNY_STICKER\]|\[NSFW_STICKER\]|\[SAD_STICKER\]|\[FEMALE_ACTION\]|\\n/g, '').trim();
+
+    if (cleanText || hasSelfie || stickerSymbol) {
+        let finalStoredText = cleanText;
+        if(stickerSymbol && config.useStickers) finalStoredText += "\n" + stickerSymbol;
+        
+        currentChatData.messages.push({ role: 'model', content: finalStoredText });
+        saveChatsToStorage();
+
+        if (cleanText) appendMessageUI(cleanText, 'bot');
+        if (stickerSymbol && config.useStickers) appendMessageUI(stickerSymbol, 'bot');
+
+        if (hasSelfie) {
+            const promptStr = encodeURIComponent(`A realistic casual selfie of a ${config.age} year old Asian ${config.gender === 'female' ? 'girl' : 'boy'}, looking at camera`);
+            const imgUrl = `https://image.pollinations.ai/prompt/${promptStr}?width=512&height=512&nologo=true`;
+            appendImageUI(imgUrl, 'bot');
+        }
+    }
+  }
+
+  function appendMessageUI(text, sender, id = null) {
+    const box = document.getElementById('chatScreen');
+    const div = document.createElement('div');
+    if (id) div.id = id;
+    div.className = `msg ${sender}`;
+    div.innerHTML = text.replace(/\n/g, '<br>');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function appendImageUI(url, sender) {
+    const box = document.getElementById('chatScreen');
+    const div = document.createElement('div');
+    div.className = `msg ${sender}`;
+    div.innerHTML = `<img src="${url}" alt="Photo">`;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+</script>
+</body>
+</html>
